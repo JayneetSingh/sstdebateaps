@@ -88,18 +88,13 @@
         <div class="muted small">Open this same file on your projector and click "Projector View" for fullscreen results. Votes sync across tabs/windows on the same browser (BroadcastChannel).</div>
       </div>
       <hr />
-        <div class="admin card">
-          <div style="display:flex;flex-direction:column;gap:8px;width:100%">
-            <div class="small muted">Google Custom Search API Configuration:</div>
-            <input id="googleApiKey" placeholder="Enter your Google API Key" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
-            <input id="googleSearchEngineId" placeholder="Enter your Custom Search Engine ID" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
-            <div style="display:flex;gap:8px;">
-              <button id="testGoogleAPI" style="padding:8px;border-radius:8px;background:#22c55e;border:none;color:#fff;cursor:pointer;flex:1">Test API</button>
-              <button id="verifyAllClaims" style="padding:8px;border-radius:8px;background:var(--accent);border:none;color:#012;cursor:pointer;flex:2">Verify All Claims</button>
-            </div>
-            <div class="small muted">Get your API key from <a href="https://developers.google.com/custom-search/v1/introduction" target="_blank" class="link">Google Custom Search API</a> and create a search engine at <a href="https://cse.google.com/" target="_blank" class="link">Google CSE</a>.</div>
-          </div>
+      <div class="admin card">
+        <div style="display:flex;flex-direction:column;gap:6px;width:100%">
+          <label class="small muted">Moderator password (teacher):</label>
+          <input id="adminPass" placeholder="teacher-password" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
+          <div class="small muted">To set a claim's validity: click a claim on the board and choose Valid / Invalid / Unsure. Moderator password optionally prevents students from changing validity.</div>
         </div>
+      </div>
     </div>
   </div>
 
@@ -122,258 +117,145 @@
   </div>
 
   <script>
-  // --- DOM Elements ---
-  const messagesEl = document.getElementById('messages')
-  const claimsList = document.getElementById('claimsList')
-  const claimInput = document.getElementById('claimInput')
-  const addClaimBtn = document.getElementById('addClaim')
-  const teamSelect = document.getElementById('teamSelect')
-  const speaker = document.getElementById('speaker')
-  const googleApiKeyEl = document.getElementById('googleApiKey')
-  const googleSearchEngineIdEl = document.getElementById('googleSearchEngineId')
-  const testGoogleAPI = document.getElementById('testGoogleAPI')
-  const verifyAllClaims = document.getElementById('verifyAllClaims')
+    const API_BASE = "https://your-app.onrender.com"; // Replace with your actual Render URL
 
-  // --- State ---
-  let claims = JSON.parse(localStorage.getItem('mock_claims')||'[]')
-  let votes = JSON.parse(localStorage.getItem('mock_votes')||'{"A":0,"B":0}')
-
-  // --- Save/Load ---
-  function save(){
-    localStorage.setItem('mock_claims',JSON.stringify(claims));
-    localStorage.setItem('mock_votes',JSON.stringify(votes))
-  }
-
-  // --- Validity Badge ---
-  function validityBadge(v){
-    if(!v) return '<span class="valid-badge unsure">Not checked</span>'
-    if(v==='checking') return '<span class="valid-badge unsure">Checking…</span>'
-    if(v==='valid') return '<span class="valid-badge valid">Valid</span>'
-    if(v==='invalid') return '<span class="valid-badge invalid">Invalid</span>'
-    if(v==='unsure') return '<span class="valid-badge unsure">Unsure</span>'
-    return '<span class="valid-badge unsure">Unknown</span>'
-  }
-
-  // --- Render Functions ---
-  function renderMessages(){
-    messagesEl.innerHTML='';
-    claims.slice().reverse().forEach(c=>{
-      const div=document.createElement('div');
-      div.className='claim';
-      div.innerHTML=`
-        <div style="display:flex;justify-content:space-between">
-          <div><strong>${c.team}</strong> — <span class="muted small">${c.speaker||'unknown'}</span></div>
-          <div class="small muted">${new Date(c.ts).toLocaleString()}</div>
-        </div>
-        <div style="margin-top:6px">${c.text}</div>
-        <div style="margin-top:8px" class="small muted">Validity: ${validityBadge(c.validity)}</div>
-        ${c.checkResult ? `<div class="small muted" style="margin-top:4px">${c.checkResult}</div>` : ''}
-      `;
-      messagesEl.appendChild(div)
-    })
-  }
-
-  function renderClaims(){
-    claimsList.innerHTML='';
-    claims.forEach((c,idx)=>{
-      const el=document.createElement('div');
-      el.className='claim';
-      el.innerHTML=`
-        <div style="display:flex;justify-content:space-between">
-          <div><strong>${c.team}</strong> — ${c.speaker||'unknown'}</div>
-          <div class="small muted">${new Date(c.ts).toLocaleString()}</div>
-        </div>
-        <div style="margin-top:6px">${c.text}</div>
-        <div style="margin-top:8px" class="small muted">${validityBadge(c.validity)}</div>
-        ${c.checkResult ? `<div class="small muted" style="margin-top:4px">${c.checkResult}</div>` : ''}
-      `;
-      claimsList.appendChild(el)
-    })
-  }
-
-  // --- Google Custom Search API Claim Check ---
-  async function checkClaimWithGoogle(claimObj) {
-    claimObj.validity = 'checking';
-    claimObj.checkResult = '';
-    save(); renderClaims(); renderMessages();
-
-    try {
-      // New (call your Node.js proxy)
-      const resp = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: claimObj.text })
-      });
-      const data = await resp.json();
-      if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
-        claimObj.validity = 'unsure';
-        claimObj.checkResult = 'No relevant results found.';
-      } else {
-        // Simple heuristic: if a fact-checking site or news site appears, mark as valid/invalid
-        const factCheckSites = [
-          'snopes.com','factcheck.org','boomlive.in','altnews.in','politifact.com','thequint.com','bbc.com','reuters.com','indiatoday.in','thehindu.com'
-        ];
-        let foundValid = false, foundInvalid = false, foundFact = false, foundNews = false;
-        let snippet = '';
-        for (const item of data.items) {
-          const link = item.link||'';
-          const displayLink = item.displayLink||'';
-          const lower = (link + ' ' + displayLink).toLowerCase();
-          snippet += (item.snippet||'') + ' ';
-          if (factCheckSites.some(site=>lower.includes(site))) foundFact = true;
-          if (lower.includes('fake') || lower.includes('false') || lower.includes('debunk')) foundInvalid = true;
-          if (lower.includes('true') || lower.includes('confirmed') || lower.includes('verified')) foundValid = true;
-          if (lower.includes('news')) foundNews = true;
+    async function searchWeb(query) {
+      try {
+        const resp = await fetch(`${API_BASE}/api/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, num: 10 })
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          console.warn('Backend search error:', resp.status, text);
+          return [];
         }
-        if (foundFact && foundInvalid) {
-          claimObj.validity = 'invalid';
-          claimObj.checkResult = 'Fact-checking sources suggest this claim is false.';
-        } else if (foundFact && foundValid) {
-          claimObj.validity = 'valid';
-          claimObj.checkResult = 'Fact-checking sources support this claim.';
-        } else if (foundValid) {
-          claimObj.validity = 'valid';
-          claimObj.checkResult = 'Multiple sources support this claim.';
-        } else if (foundInvalid) {
-          claimObj.validity = 'invalid';
-          claimObj.checkResult = 'Multiple sources dispute this claim.';
-        } else if (foundNews) {
-          claimObj.validity = 'unsure';
-          claimObj.checkResult = 'News sources discuss this claim, but no clear verdict.';
-        } else {
-          claimObj.validity = 'unsure';
-          claimObj.checkResult = 'No clear evidence found.';
-        }
+        const data = await resp.json();
+        return (data.items || []).map(item => ({
+          title: item.title,
+          snippet: item.snippet || '',
+          url: item.link,
+          credibility: 'unknown'
+        }));
+      } catch (err) {
+        console.error('searchWeb proxy error', err);
+        return [];
       }
-    } catch (e) {
-      claimObj.validity = 'unsure';
-      claimObj.checkResult = 'Error checking claim: ' + e.message;
     }
-    save(); renderClaims(); renderMessages();
-  }
 
-  // --- Add Claim ---
-  addClaimBtn.onclick=()=>{
-    const txt = claimInput.value.trim();
-    if(!txt) return;
-    const claim = {
-      team: teamSelect.value,
-      speaker: speaker.value||'',
-      text: txt,
-      ts: Date.now(),
-      validity: '',
-      checkResult: ''
+    // --- Claims and Voting Logic (unchanged) ---
+    const messagesEl = document.getElementById('messages');
+    const claimsList = document.getElementById('claimsList');
+    const claimInput = document.getElementById('claimInput');
+    const addClaimBtn = document.getElementById('addClaim');
+    const teamSelect = document.getElementById('teamSelect');
+    const speaker = document.getElementById('speaker');
+    const adminPass = document.getElementById('adminPass');
+
+    let claims = JSON.parse(localStorage.getItem('mock_claims')||'[]');
+    let votes = JSON.parse(localStorage.getItem('mock_votes')||'{"A":0,"B":0}');
+
+    function save(){localStorage.setItem('mock_claims',JSON.stringify(claims));localStorage.setItem('mock_votes',JSON.stringify(votes));}
+
+    function validityBadge(v){
+      if(!v) return '<span class="valid-badge unsure">Not marked</span>';
+      if(v==='valid') return '<span class="valid-badge valid">Valid</span>';
+      if(v==='invalid') return '<span class="valid-badge invalid">Invalid</span>';
+      return '<span class="valid-badge unsure">Unsure</span>';
+    }
+
+    function renderMessages(){messagesEl.innerHTML='';claims.slice().reverse().forEach(c=>{
+      const div=document.createElement('div');div.className='claim';div.innerHTML=`<div style="display:flex;justify-content:space-between"><div><strong>${c.team}</strong> — <span class="muted small">${c.speaker||'unknown'}</span></div><div class="small muted">${new Date(c.ts).toLocaleString()}</div></div><div style="margin-top:6px">${c.text}</div><div style="margin-top:8px" class="small muted">Validity: ${validityBadge(c.validity)}</div>`;
+      messagesEl.appendChild(div);
+    });}
+
+    function renderClaims(){claimsList.innerHTML='';claims.forEach((c,idx)=>{
+      const el=document.createElement('div');el.className='claim';el.innerHTML=`<div style="display:flex;justify-content:space-between"><div><strong>${c.team}</strong> — ${c.speaker||'unknown'}</div><div class="small muted">${new Date(c.ts).toLocaleString()}</div></div><div style="margin-top:6px">${c.text}</div><div style="margin-top:8px" class="small muted">${validityBadge(c.validity)}</div>`;
+      el.onclick=()=>openClaimEditor(idx);
+      claimsList.appendChild(el);
+    });}
+
+    function openClaimEditor(i){
+      const c = claims[i];
+      const choice = prompt('Mark validity for this claim: type "valid", "invalid", or "unsure" (leave blank to cancel).');
+      if(choice===null) return;
+      const val = choice.trim().toLowerCase();
+      if(!val) return;
+      if(adminPass.value && adminPass.value.trim()!==''){
+        const pw = prompt('Enter moderator password to apply change (ask your teacher).');
+        if(pw===null) return;
+        if(pw!==adminPass.value){ alert('Wrong password — change not applied.'); return; }
+      }
+      if(['valid','invalid','unsure'].includes(val)){
+        c.validity = val;
+        save(); renderClaims(); renderMessages();
+        alert('Validity set to: ' + val);
+      } else {
+        alert('Invalid input. Use exactly: valid, invalid, or unsure.');
+      }
+    }
+
+    addClaimBtn.onclick=()=>{
+      const txt = claimInput.value.trim(); if(!txt) return;
+      const claim = {team:teamSelect.value, speaker:speaker.value||'', text:txt, ts:Date.now(), validity:''};
+      claims.push(claim); claimInput.value=''; save(); renderClaims(); renderMessages();
     };
-    claims.push(claim);
-    claimInput.value='';
-    save(); renderClaims(); renderMessages();
-    // Automatically check claim with Google
-    checkClaimWithGoogle(claim);
-  }
 
-  // --- Verify All Claims Button ---
-  verifyAllClaims.onclick = async () => {
-    for (const claim of claims) {
-      if (!claim.validity || claim.validity === 'unsure') {
-        await checkClaimWithGoogle(claim);
+    const chan = ('BroadcastChannel' in window) ? new BroadcastChannel('mock-debate-votes') : null;
+    function broadcast(){ if(chan) chan.postMessage({type:'votes',votes}); }
+    if(chan){chan.onmessage = (ev)=>{ if(ev.data && ev.data.type==='votes'){ votes = ev.data.votes; save(); renderVotes(); } }}
+
+    document.getElementById('voteA').onclick=()=>{ votes.A++; save(); broadcast(); renderVotes(); };
+    document.getElementById('voteB').onclick=()=>{ votes.B++; save(); broadcast(); renderVotes(); };
+    document.getElementById('resetVotes').onclick=()=>{ if(confirm('Reset votes?')){ votes={A:0,B:0}; save(); broadcast(); renderVotes(); } };
+
+    function renderVotes(){
+      document.getElementById('teamACount').innerText = votes.A;
+      document.getElementById('teamBCount').innerText = votes.B;
+      document.getElementById('projA').innerText = votes.A;
+      document.getElementById('projB').innerText = votes.B;
+      document.getElementById('projWinner').innerText = votes.A===votes.B? 'Tie' : (votes.A>votes.B? 'Team A leading' : 'Team B leading');
+    }
+
+    document.getElementById('downloadCSV').onclick=()=>{
+      const rows = [['Team','Votes'],['Team A ('+document.getElementById('teamAName').innerText+')',votes.A],['Team B ('+document.getElementById('teamBName').innerText+')',votes.B]];
+      const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='mock_debate_votes.csv';a.click();URL.revokeObjectURL(url);
+    };
+
+    async function openBigScreen(){
+      const title = 'Mock Debate Live Results';
+      var contentHTML = '<!doctype html>'+ '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>' + title.replace(/</g,'&lt;') + '</title>' + '<style>body{margin:0;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh}.wrap{display:flex;gap:80px;align-items:center}.big{font-size:72px;font-weight:700}.tag{font-size:18px;opacity:0.8}</style>' + '</head><body>' + '<div class="wrap"><div><div class="tag">Team A</div><div id="a" class="big">0</div></div><div><div class="tag">Team B</div><div id="b" class="big">0</div></div></div>' + '<script>' + "(function(){var bc=(typeof BroadcastChannel!=='undefined')?new BroadcastChannel('mock-debate-votes'):null;function update(v){var A=document.getElementById('a');var B=document.getElementById('b');if(A)A.innerText=v.A; if(B)B.innerText=v.B;}if(bc){bc.onmessage=function(e){if(e.data&&e.data.type==='votes')update(e.data.votes);};}try{if(window.opener&&window.opener.localStorage){var s=window.opener.localStorage.getItem('mock_votes');if(s)update(JSON.parse(s));}}catch(e){} })();" + '</scr' + 'ipt></body></html>';
+
+      try{
+        const bigWin = window.open('','_blank');
+        if(!bigWin){ throw new Error('Popup blocked'); }
+        const doc = bigWin.document;
+        doc.open();
+        doc.write(contentHTML);
+        doc.close();
+        return true;
+      }catch(err){
+        console.warn('openBigScreen failed:',err);
+        document.getElementById('projector').style.display='flex';
+        return false;
       }
     }
-  };
 
-  // --- Test API Button ---
-  testGoogleAPI.onclick = async () => {
-    const apiKey = googleApiKeyEl.value.trim();
-    const cx = googleSearchEngineIdEl.value.trim();
-    if (!apiKey || !cx) {
-      alert('Please enter both API Key and Search Engine ID.');
-      return;
-    }
-    try {
-      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=test`;
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('API error');
-      const data = await resp.json();
-      if (data.items && data.items.length > 0) {
-        alert('API test succeeded!');
-      } else {
-        alert('API test did not return results. Check your Search Engine ID.');
+    document.getElementById('openProjector').onclick=async()=>{
+      document.getElementById('projector').style.display='flex';
+      await new Promise(r=>setTimeout(r,500));
+      renderVotes();
+    };
+
+    document.addEventListener('keydown',ev=>{
+      if(ev.key==='Escape' || ev.key==='Esc'){
+        document.getElementById('projector').style.display='none';
       }
-    } catch (e) {
-      alert('API test failed: ' + e.message);
-    }
-  };
-
-  // --- Votes using BroadcastChannel for live sync across tabs ---
-  const chan = ('BroadcastChannel' in window) ? new BroadcastChannel('mock-debate-votes') : null
-  function broadcast(){ if(chan) chan.postMessage({type:'votes',votes}) }
-  if(chan){chan.onmessage = (ev)=>{ if(ev.data && ev.data.type==='votes'){ votes = ev.data.votes; save(); renderVotes(); } }}
-
-  document.getElementById('voteA').onclick=()=>{ votes.A++; save(); broadcast(); renderVotes(); }
-  document.getElementById('voteB').onclick=()=>{ votes.B++; save(); broadcast(); renderVotes(); }
-  document.getElementById('resetVotes').onclick=()=>{ if(confirm('Reset votes?')){ votes={A:0,B:0}; save(); broadcast(); renderVotes(); } }
-
-  function renderVotes(){
-    document.getElementById('teamACount').innerText = votes.A
-    document.getElementById('teamBCount').innerText = votes.B
-    document.getElementById('projA').innerText = votes.A
-    document.getElementById('projB').innerText = votes.B
-    document.getElementById('projWinner').innerText = votes.A===votes.B? 'Tie' : (votes.A>votes.B? 'Team A leading' : 'Team B leading')
-  }
-
-  document.getElementById('downloadCSV').onclick=()=>{
-    const rows = [['Team','Votes'],['Team A ('+document.getElementById('teamAName').innerText+')',votes.A],['Team B ('+document.getElementById('teamBName').innerText+')',votes.B]]
-    const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')
-    const blob = new Blob([csv],{type:'text/csv'})
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'votes.csv'
-    a.click()
-  }
-
-  // --- On Load: restore API keys if present ---
-  window.addEventListener('DOMContentLoaded',()=>{
-    googleApiKeyEl.value = localStorage.getItem('google_api_key') || '';
-    googleSearchEngineIdEl.value = localStorage.getItem('google_search_engine_id') || '';
-    googleApiKeyEl.onchange = () => localStorage.setItem('google_api_key', googleApiKeyEl.value.trim());
-    googleSearchEngineIdEl.onchange = () => localStorage.setItem('google_search_engine_id', googleSearchEngineIdEl.value.trim());
-    renderClaims(); renderMessages(); renderVotes();
-  });
-
-  // --- Projector View ---
-  async function openBigScreen(){
-    const title = 'Mock Debate Live Results'
-    var contentHTML = '<!doctype html>' +
-      '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-      '<title>' + title.replace(/</g,'&lt;') + '</title>' +
-      '<style>body{margin:0;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh}.wrap{display:flex;gap:80px;align-items:center}.big{font-size:72px;font-weight:700}.tag{font-size:18px;opacity:0.8}</style>' +
-      '</head><body>' +
-      '<div class="wrap"><div><div class="tag">Team A</div><div id="a" class="big">0</div></div><div><div class="tag">Team B</div><div id="b" class="big">0</div></div></div>' +
-      '<script>' +
-      "(function(){var bc=(typeof BroadcastChannel!=='undefined')?new BroadcastChannel('mock-debate-votes'):null;function update(v){var A=document.getElementById('a');var B=document.getElementById('b');if(A)A.innerText=v.A; if(B)B.innerText=v.B;}if(bc){bc.onmessage=function(e){if(e.data&&e.data.type==='votes')update(e.data.votes);};}try{if(window.opener&&window.opener.localStorage){var s=window.opener.localStorage.getItem('mock_votes');if(s)update(JSON.parse(s));}}catch(e){} })();"
-      + '</scr' + 'ipt></body></html>'
-
-    try{
-      const bigWin = window.open('','_blank')
-      if(!bigWin){ throw new Error('Popup blocked') }
-      const doc = bigWin.document
-      doc.open()
-      doc.write(contentHTML)
-      doc.close()
-      return true
-    }catch(err){
-      console.warn('openBigScreen failed:',err)
-      document.getElementById('projector').style.display='flex'
-      return false
-    }
-  }
-
-  document.getElementById('openProjector').onclick=()=>{ openBigScreen() }
-  window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ document.getElementById('projector').style.display='none' } })
-
-  // If the script runs before DOMContentLoaded (rare in this file), ensure initialization
-  if(document.readyState!=='loading'){
-    renderClaims(); renderMessages(); renderVotes();
-  }
-</script>
+    });
+  </script>
 </body>
 </html>
