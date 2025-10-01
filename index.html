@@ -38,7 +38,6 @@
   <div class="app">
     <div class="card">
       <h1>Mock Debate Chatbot — Rahul Gandhi vs Narendra Modi (classroom edition)</h1>
-      <div class="muted">Collect claims and automatically verify them using your backend proxy (Google API key hidden on server).</div>
       <hr />
       <div style="display:flex;gap:10px;margin-bottom:8px;">
         <select id="teamSelect"><option value="Rahul Gandhi / Congress">Team A — Rahul Gandhi side</option><option value="Narendra Modi / BJP">Team B — Narendra Modi side</option></select>
@@ -54,14 +53,14 @@
       <hr />
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="small muted">Claims board — automatically verified using your backend</div>
+          <div class="small muted">Claims board — automatically verified using google</div>
           <div>
             <button id="openProjector" class="bigbtn">Open Projector View</button>
           </div>
         </div>
         <div class="list" id="claimsList"></div>
       </div>
-      <footer>Claims are verified server-side using the Google Custom Search API. The frontend never exposes your API key.</footer>
+      <footer>Claims are verified server-side using Google</footer>
     </div>
 
     <div class="card">
@@ -85,12 +84,10 @@
           <button id="resetVotes">Reset</button>
           <button id="downloadCSV">Export CSV</button>
         </div>
-        <div class="muted small">Open this same file on your projector and click "Projector View" for fullscreen results. Votes sync across tabs/windows on the same browser (BroadcastChannel).</div>
       </div>
       <hr />
       <div class="admin card">
         <div style="display:flex;flex-direction:column;gap:8px;width:100%">
-          <div class="small muted">Claims verification is done via your backend proxy — no API key needed in the browser.</div>
           <button id="verifyAllClaims" style="padding:8px;border-radius:8px;background:var(--accent);border:none;color:#012;cursor:pointer">Verify All Claims</button>
         </div>
       </div>
