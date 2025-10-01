@@ -1,7 +1,6 @@
 {
-  "name": "debate-proxy",
+  "name": "sstdebateaps",
   "version": "1.0.0",
-  "description": "Backend proxy for Mock Debate Chatbot (hides Google API key)",
   "main": "server.js",
   "type": "module",
   "scripts": {
