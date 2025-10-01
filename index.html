@@ -82,6 +82,7 @@
           <button id="voteA">Vote Team A</button>
           <button id="voteB">Vote Team B</button>
           <button id="resetVotes">Reset</button>
+          <button id="clearClaims">Clear Claims</button>
           <button id="downloadCSV">Export CSV</button>
         </div>
       </div>
@@ -345,6 +346,39 @@
       document.getElementById('verifyAllClaims').onclick = verifyAllClaims;
       renderClaims(); renderMessages(); renderVotes();
     });
+    // Clear only claims (keeps votes intact)
+document.getElementById('clearClaims').onclick = () => {
+  // If mod password is set, require it
+  if (adminPass.value && adminPass.value.trim() !== '') {
+    const pw = prompt('Moderator password required to clear claims. Enter password:');
+    if (pw === null) return; // cancelled
+    if (pw !== adminPass.value) { alert('Wrong password — action cancelled.'); return; }
+  }
+
+  if (!claims || claims.length === 0) {
+    alert('No claims to clear.');
+    return;
+  }
+
+  if (!confirm(`Delete all ${claims.length} claims? This cannot be undone.`)) return;
+
+  // perform clear
+  claims = [];
+  save();
+  renderClaims();
+  renderMessages();
+
+  // optional: notify other tabs via BroadcastChannel (so projector / other tabs update)
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const bc = new BroadcastChannel('mock-debate-votes');
+      bc.postMessage({ type: 'claims_cleared' });
+    } catch (e) { /* ignore */ }
+  }
+
+  alert('All claims cleared.');
+};
+
 
     // ---------- Votes (unchanged) ----------
     const chan = ('BroadcastChannel' in window) ? new BroadcastChannel('mock-debate-votes') : null;
