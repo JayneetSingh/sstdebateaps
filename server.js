@@ -1,19 +1,19 @@
-import express from "express";
-import fetch from "node-fetch";
-import cors from "cors";
+const express = require("express");
+const cors = require("cors");
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-// AI Verify endpoint
 app.post("/api/ai-verify", async (req, res) => {
   try {
-    const { claim, team, topic } = req.body;
-    if (!claim) return res.status(400).json({ error: "Missing claim" });
+    const { claim, topic, stance } = req.body;
+    if (!claim) return res.status(400).json({ error: "Claim text required" });
 
-    const stance = team === "A" ? "For" : "Against";
-    const context = `Topic: ${topic}\nTeam stance: ${stance}\nQuestion: Does this claim SUPPORT this team's stance, CONTRADICT it, or is it NEUTRAL?`;
+    // Build context for Hugging Face
+    const fullPrompt = `Debate topic: ${topic}. Team stance: ${stance}. Claim: "${claim}". 
+    Decide if this supports the stance (valid), contradicts it (invalid), or is unrelated (unsure).`;
 
     const hfResp = await fetch("https://api-inference.huggingface.co/models/facebook/bart-large-mnli", {
       method: "POST",
@@ -22,32 +22,19 @@ app.post("/api/ai-verify", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        inputs: `${context}\nClaim: "${claim}"`,
-        parameters: {
-          candidate_labels: ["supports", "contradicts", "neutral"]
-        }
+        inputs: fullPrompt,
+        parameters: { candidate_labels: ["valid", "invalid", "unsure"] }
       })
     });
 
-    if (!hfResp.ok) {
-      const txt = await hfResp.text();
-      return res.status(502).json({ error: "HuggingFace error", details: txt });
-    }
-
-    const out = await hfResp.json();
-    const label = out.labels?.[0] || "neutral";
-
-    let verdict = "unsure";
-    if (label === "supports") verdict = "valid";
-    else if (label === "contradicts") verdict = "invalid";
-
-    res.json({ verdict, raw: out });
+    const result = await hfResp.json();
+    res.json(result);
   } catch (err) {
-    console.error("AI verify error:", err);
-    res.status(500).json({ error: "Server error", details: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Start server
+app.get("/", (req, res) => res.send("Mock Debate API is live 🚀"));
+
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
