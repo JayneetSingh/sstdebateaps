@@ -1,135 +1,392 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mock Debate Chatbot</title>
-  <style>
-    body { margin:0; font-family:sans-serif; background:#0b1526; color:#e6eef6; }
-    .container { display:flex; gap:20px; padding:20px; }
-    .left, .right { flex:1; background:#101c33; padding:16px; border-radius:12px; }
-    h2 { margin-top:0; }
-    textarea { width:100%; min-height:50px; }
-    button { margin-top:6px; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; }
-    .claim { margin:6px 0; padding:6px; border-radius:6px; }
-    .valid { background:rgba(0,200,0,0.2); }
-    .invalid { background:rgba(200,0,0,0.2); }
-    .unsure { background:rgba(200,200,0,0.2); }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mock Debate — AI Fact-check Classroom</title>
+<link rel="icon" href="data:," />
+<style>
+  :root{
+    --bg:#071027; --card:#0b1220; --muted:#9aa6b2; --accent:#06b6d4;
+    --good:#16a34a; --bad:#ef4444; --warn:#eab308; --glass: rgba(255,255,255,0.03);
+    --radius:14px; --gap:14px; color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(6,11,23,0.7), transparent 10%),
+    linear-gradient(180deg,#041022 0%, #071027 100%);font-family:Inter,system-ui,Segoe UI,Roboto,Arial; color:#e6eef6}
+  .wrap{max-width:1200px;margin:26px auto;padding:18px;display:grid;grid-template-columns:1fr 380px;gap:var(--gap)}
+  header{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  h1{margin:0;font-size:20px}
+  .sub{color:var(--muted);font-size:13px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:var(--radius); padding:16px; box-shadow:0 6px 20px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03)}
+  /* Left area */
+  .left{display:flex;flex-direction:column;gap:14px}
+  .setup{display:flex;gap:12px;align-items:center}
+  .setup input, .setup select{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  .setup .grow{flex:1}
+  .big-input{padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;width:100%}
+  .claim-area{display:flex;gap:12px}
+  textarea.claimbox{flex:1;min-height:62px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;resize:vertical}
+  button.btn{background:var(--accent);border:none;color:#012;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+  button.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+  .claims-list{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto;padding-right:6px}
+  .claim-card{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.015), transparent);border:1px solid rgba(255,255,255,0.02);display:flex;justify-content:space-between;gap:12px}
+  .claim-main{flex:1}
+  .meta{color:var(--muted);font-size:13px;margin-top:6px;display:flex;gap:8px;align-items:center}
+  .badge{padding:6px 8px;border-radius:999px;font-size:12px}
+  .badge.valid{background:rgba(16,185,129,0.12);color:var(--good)}
+  .badge.invalid{background:rgba(239,68,68,0.12);color:var(--bad)}
+  .badge.unsure{background:rgba(234,179,8,0.12);color:var(--warn)}
+  .controls{display:flex;gap:8px;align-items:center}
+  .muted{color:var(--muted);font-size:13px}
+  /* Right area */
+  .right{display:flex;flex-direction:column;gap:14px}
+  .score{display:flex;justify-content:space-around;align-items:center;gap:12px;padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)}
+  .score .team{text-align:center}
+  .team .label{font-size:13px;color:var(--muted)}
+  .team .count{font-size:42px;font-weight:700}
+  .vote-row{display:flex;gap:10px;flex-wrap:wrap}
+  .danger{background:#ef4444;color:#fff}
+  .export{background:#0ea5b7;color:#012}
+  /* projector */
+  .projector{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000}
+  .proj-card{color:#fff;text-align:center}
+  .proj-num{font-size:120px;font-weight:700}
+  /* small responsive */
+  @media(max-width:980px){
+    .wrap{grid-template-columns:1fr; padding:12px}
+    .right{order:-1}
+  }
+</style>
 </head>
 <body>
-  <div class="container">
-    <div class="left">
-      <h2>Debate Setup</h2>
-      <label>Debate Topic:</label>
-      <input id="topic" type="text" placeholder="Enter topic (e.g., Vote Scam)" style="width:100%;margin-bottom:10px;" />
-
-      <label>Team A (For):</label>
-      <input id="teamAName" type="text" placeholder="e.g., Rahul Gandhi / Congress" style="width:100%;margin-bottom:10px;" />
-
-      <label>Team B (Against):</label>
-      <input id="teamBName" type="text" placeholder="e.g., Narendra Modi / BJP" style="width:100%;margin-bottom:10px;" />
-
-      <h2>Add Claim</h2>
-      <select id="teamSelect">
-        <option value="A">Team A</option>
-        <option value="B">Team B</option>
-      </select>
-      <input id="speaker" type="text" placeholder="Speaker name" />
-      <textarea id="claimInput" placeholder="Enter claim..."></textarea>
-      <button id="addClaim">Add Claim</button>
-
-      <h2>Claims Board</h2>
-      <div id="claimsBoard"></div>
-      <button id="clearClaims" style="background:#c33;color:#fff;">Clear Claims</button>
-    </div>
-
-    <div class="right">
-      <h2>Vote Counter</h2>
-      <div id="scoreboard">
-        <p><span id="teamA_label">Team A</span>: <span id="scoreA">0</span></p>
-        <p><span id="teamB_label">Team B</span>: <span id="scoreB">0</span></p>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Mock Debate — AI Fact-check</h1>
+        <div class="sub">Topic-aware claim validator & live vote counter — moderator controls</div>
       </div>
-      <button onclick="vote('A')">Vote Team A</button>
-      <button onclick="vote('B')">Vote Team B</button>
-      <button onclick="resetVotes()">Reset</button>
+      <div class="sub">Saved locally · Backend: <strong style="color:var(--accent)">Render AI</strong></div>
+    </header>
+
+    <!-- LEFT: claims / input -->
+    <section class="left card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <label class="muted">Debate topic</label>
+          <input id="topic" class="big-input" placeholder="e.g., Rahul Gandhi vs Narendra Modi — ECI vote scam" />
+        </div>
+        <div style="width:220px">
+          <label class="muted">Moderator password</label>
+          <input id="modPass" class="big-input" placeholder="teacher-password" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">
+          <label class="muted">Team A (For)</label>
+          <input id="teamA" class="big-input" placeholder="Rahul Gandhi / Congress" />
+        </div>
+        <div style="flex:1">
+          <label class="muted">Team B (Against)</label>
+          <input id="teamB" class="big-input" placeholder="Narendra Modi / BJP" />
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)"/>
+
+      <div class="claim-area">
+        <select id="claimTeam" style="width:160px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+          <option value="A">Team A (For)</option>
+          <option value="B">Team B (Against)</option>
+        </select>
+        <input id="speaker" placeholder="Speaker name (optional)" style="width:200px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit" />
+        <textarea id="claimInput" class="claimbox" placeholder="Paste claim here — just the claim text."></textarea>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button id="addClaim" class="btn">Add Claim</button>
+          <button id="openProjector" class="btn ghost">Projector</button>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <div class="muted small">Claims board — AI checks each claim in the debate context</div>
+        <div class="controls">
+          <button id="verifyAll" class="btn ghost">Verify All</button>
+          <button id="clearClaims" class="btn ghost danger">Clear Claims</button>
+        </div>
+      </div>
+
+      <div class="claims-list" id="claimsList" aria-live="polite" style="margin-top:8px"></div>
+    </section>
+
+    <!-- RIGHT: votes + config -->
+    <aside class="right">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Vote Counter (Live)</strong><div class="muted small">Use in-class voting</div></div>
+          <div class="muted small">Sync: BroadcastChannel</div>
+        </div>
+        <div class="score" style="margin-top:12px">
+          <div class="team">
+            <div class="label" id="labelA">Team A</div>
+            <div class="count" id="countA">0</div>
+          </div>
+          <div class="team">
+            <div class="label" id="labelB">Team B</div>
+            <div class="count" id="countB">0</div>
+          </div>
+        </div>
+        <div style="margin-top:12px" class="vote-row">
+          <button id="voteA" class="btn">Vote A</button>
+          <button id="voteB" class="btn">Vote B</button>
+          <button id="resetVotes" class="btn ghost">Reset</button>
+          <button id="exportCSV" class="btn export">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>AI Config</strong>
+          <span class="muted small">Your HF key stays on backend</span>
+        </div>
+        <div style="margin-top:10px" class="muted small">Backend URL</div>
+        <input id="apiBase" class="big-input" value="https://sstdebateaps.onrender.com" />
+        <div style="margin-top:8px" class="muted small">Tip: keep this as your Render URL. Never put HF API key in frontend.</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- projector -->
+  <div class="projector" id="projector">
+    <div class="proj-card">
+      <div style="font-size:28px" id="projTitle">Live Results</div>
+      <div style="display:flex;gap:40px;justify-content:center;align-items:center;margin-top:18px">
+        <div style="text-align:center">
+          <div class="muted">Team A</div>
+          <div class="proj-num" id="projA">0</div>
+        </div>
+        <div style="text-align:center">
+          <div class="muted">Team B</div>
+          <div class="proj-num" id="projB">0</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <script>
-    const API_BASE = "https://sstdebateaps.onrender.com"; // your Render backend
-    let claims = [];
-    let scoreA = 0, scoreB = 0;
+<script>
+/* -------------------------
+   Simple state + persistence
+   ------------------------- */
+const LS_PREFIX = "sstdebate_v2_";
+const $ = id => document.getElementById(id);
 
-    // Update team labels when inputs change
-    document.getElementById("teamAName").addEventListener("input", () => {
-      document.getElementById("teamA_label").innerText = document.getElementById("teamAName").value || "Team A";
-    });
-    document.getElementById("teamBName").addEventListener("input", () => {
-      document.getElementById("teamB_label").innerText = document.getElementById("teamBName").value || "Team B";
-    });
+let claims = JSON.parse(localStorage.getItem(LS_PREFIX + "claims") || "[]");
+let votes = JSON.parse(localStorage.getItem(LS_PREFIX + "votes") || '{"A":0,"B":0}');
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('sst-debate-votes') : null;
 
-    function renderClaims() {
-      const board = document.getElementById("claimsBoard");
-      board.innerHTML = "";
-      claims.forEach((c, i) => {
-        const div = document.createElement("div");
-        div.className = "claim " + c.status;
-        div.innerHTML = `<b>${c.teamName} — ${c.speaker}</b><br>${c.text}<br>Status: ${c.status}`;
-        board.appendChild(div);
-      });
+/* load saved settings */
+function loadSettings(){
+  $('topic').value = localStorage.getItem(LS_PREFIX + "topic") || "";
+  $('teamA').value = localStorage.getItem(LS_PREFIX + "teamA") || "Team A";
+  $('teamB').value = localStorage.getItem(LS_PREFIX + "teamB") || "Team B";
+  $('modPass').value = localStorage.getItem(LS_PREFIX + "modPass") || "";
+  $('apiBase').value = localStorage.getItem(LS_PREFIX + "apiBase") || "https://sstdebateaps.onrender.com";
+  updateLabels();
+}
+function saveSettings(){
+  localStorage.setItem(LS_PREFIX + "topic", $('topic').value);
+  localStorage.setItem(LS_PREFIX + "teamA", $('teamA').value);
+  localStorage.setItem(LS_PREFIX + "teamB", $('teamB').value);
+  localStorage.setItem(LS_PREFIX + "modPass", $('modPass').value);
+  localStorage.setItem(LS_PREFIX + "apiBase", $('apiBase').value);
+}
+
+/* save + broadcast */
+function persist(){
+  localStorage.setItem(LS_PREFIX + "claims", JSON.stringify(claims));
+  localStorage.setItem(LS_PREFIX + "votes", JSON.stringify(votes));
+  saveSettings();
+  if(bc) bc.postMessage({type:'sync',claims,votes});
+}
+
+/* broadcast listener */
+if(bc){ bc.onmessage = e => {
+  if(e.data && e.data.type === 'sync'){ claims = e.data.claims || claims; votes = e.data.votes || votes; renderAll(); }
+}}
+
+/* -------------------------
+   Render functions
+   ------------------------- */
+function updateLabels(){
+  $('labelA').innerText = $('teamA').value || "Team A";
+  $('labelB').innerText = $('teamB').value || "Team B";
+  $('projTitle').innerText = $('topic').value || "Live Results";
+}
+function renderClaims(){
+  const wrap = $('claimsList'); wrap.innerHTML = "";
+  claims.slice().reverse().forEach((c, idx) => {
+    const i = claims.length - 1 - idx; // convert reversed index to actual
+    const el = document.createElement('div'); el.className = 'claim-card';
+    const status = c.status || 'unsure';
+    const badgeClass = (status==='valid'?'valid':(status==='invalid'?'invalid':'unsure'));
+    el.innerHTML = `
+      <div class="claim-main">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <strong>${c.teamName}</strong> · <span class="muted small">${c.speaker||'anon'}</span>
+            <div style="margin-top:8px;font-size:15px">${escapeHtml(c.text)}</div>
+            <div class="meta">
+              <div class="badge ${badgeClass}">${status.toUpperCase()}</div>
+              <div class="muted">${new Date(c.ts).toLocaleString()}</div>
+              ${c.ai_score? `<div class="muted">· AI ${Math.round(c.ai_score*100)}%</div>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+            <button class="btn ghost" onclick="openOverride(${i})">Override</button>
+            <button class="btn ghost" onclick="deleteClaim(${i})">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+    wrap.appendChild(el);
+  });
+}
+
+function renderVotes(){
+  $('countA').innerText = votes.A;
+  $('countB').innerText = votes.B;
+  $('projA').innerText = votes.A;
+  $('projB').innerText = votes.B;
+}
+
+/* master render */
+function renderAll(){ updateLabels(); renderClaims(); renderVotes(); }
+
+/* -------------------------
+   Actions
+   ------------------------- */
+function escapeHtml(s){ return (s+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function addClaim(){
+  const text = $('claimInput').value.trim();
+  if(!text) return;
+  const teamKey = $('claimTeam').value;
+  const teamName = teamKey === 'A' ? $('teamA').value || 'Team A' : $('teamB').value || 'Team B';
+  const claim = { text, speaker: $('speaker').value || 'anon', team: teamKey, teamName, ts: Date.now(), status: 'verifying' };
+  claims.push(claim); $('claimInput').value = ''; persist(); renderAll();
+  verifyClaim(claim, claims.length-1);
+}
+
+/* delete */
+function deleteClaim(i){
+  if(!confirm('Delete this claim?')) return;
+  claims.splice(i,1); persist(); renderAll();
+}
+
+/* override (moderator) */
+function openOverride(i){
+  const mod = $('modPass').value || '';
+  if(mod){
+    const pw = prompt('Enter moderator password to override:');
+    if(pw === null) return;
+    if(pw !== mod){ alert('Wrong password'); return; }
+  }
+  const opt = prompt('Type one of: valid, invalid, unsure (leave blank to cancel)');
+  if(!opt) return;
+  const val = opt.trim().toLowerCase();
+  if(!['valid','invalid','unsure'].includes(val)){ alert('Use valid, invalid, or unsure'); return; }
+  claims[i].status = val; persist(); renderAll();
+}
+
+/* clear */
+function clearClaims(){
+  if(!confirm('Clear ALL claims?')) return;
+  claims = []; persist(); renderAll();
+}
+
+/* verify all */
+async function verifyAll(){
+  for(let i=0;i<claims.length;i++){
+    if(!claims[i].text) continue;
+    claims[i].status = 'verifying'; persist(); renderAll();
+    await verifyClaim(claims[i], i);
+  }
+}
+
+/* verify single claim — talk to backend */
+async function verifyClaim(claimObj, index){
+  const api = $('apiBase').value.replace(/\/+$/,'') + '/api/ai-verify';
+  const body = {
+    claim: claimObj.text,
+    team: claimObj.team,
+    topic: $('topic').value || ''
+  };
+  try{
+    const r = await fetch(api, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const j = await r.json();
+    // backend sends { verdict: 'valid'|'invalid'|'unsure', model_score, raw }
+    if(j.verdict) { claimObj.status = j.verdict; claimObj.ai_score = j.model_score || (j.raw?.scores?.[0] || 0); }
+    else if(j.labels && j.labels[0]) {
+      // fallback if backend returns HF raw
+      const lab = (j.labels[0] || '').toLowerCase();
+      if(lab.includes('support')) claimObj.status='valid';
+      else if(lab.includes('contrad')) claimObj.status='invalid';
+      else claimObj.status='unsure';
+      claimObj.ai_score = j.scores?.[0] || null;
+    } else {
+      claimObj.status='unsure';
     }
+  }catch(err){
+    console.error('verify error',err);
+    claimObj.status='unsure';
+  }
+  persist(); renderAll();
+}
 
-    document.getElementById("addClaim").onclick = () => {
-      const text = document.getElementById("claimInput").value.trim();
-      const speaker = document.getElementById("speaker").value.trim() || "anon";
-      const teamVal = document.getElementById("teamSelect").value;
-      const teamName = teamVal === "A" ? document.getElementById("teamAName").value || "Team A"
-                                       : document.getElementById("teamBName").value || "Team B";
-      if (!text) return;
+/* votes */
+function voteA(){ votes.A++; persist(); renderVotes(); }
+function voteB(){ votes.B++; persist(); renderVotes(); }
+function resetVotes(){ if(confirm('Reset votes?')){ votes={A:0,B:0}; persist(); renderVotes(); } }
+function exportCSV(){
+  const rows=[['Team','Votes'],[ $('teamA').value || 'Team A', votes.A ],[ $('teamB').value || 'Team B', votes.B ]];
+  const csv = rows.map(r => r.map(x=>`"${(''+x).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='votes.csv'; a.click();
+}
 
-      const claim = { text, speaker, team: teamVal, teamName, status: "verifying" };
-      claims.push(claim);
-      renderClaims();
-      verifyClaim(claim, claims.length - 1);
-      document.getElementById("claimInput").value = "";
-    };
+/* projector */
+function openProjector(){ $('projector').style.display='flex'; }
+function closeProjector(){ $('projector').style.display='none'; }
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeProjector(); });
 
-    async function verifyClaim(claim, index) {
-      try {
-        const resp = await fetch(`${API_BASE}/api/ai-verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            claim: claim.text,
-            team: claim.team,
-            topic: document.getElementById("topic").value || "General Debate"
-          })
-        });
-        const data = await resp.json();
-        claims[index].status = data.verdict || "unsure";
-      } catch (e) {
-        claims[index].status = "unsure";
-      }
-      renderClaims();
-    }
+/* -------------------------
+   UI hooks
+   ------------------------- */
+$('addClaim').addEventListener('click', addClaim);
+$('clearClaims').addEventListener('click', () => { clearClaims(); });
+$('verifyAll').addEventListener('click', verifyAll);
+$('openProjector').addEventListener('click', openProjector);
+$('voteA').addEventListener('click', voteA);
+$('voteB').addEventListener('click', voteB);
+$('resetVotes').addEventListener('click', resetVotes);
+$('exportCSV').addEventListener('click', exportCSV);
 
-    document.getElementById("clearClaims").onclick = () => {
-      claims = [];
-      renderClaims();
-    };
+/* persist settings on change */
+['topic','teamA','teamB','modPass','apiBase'].forEach(id => {
+  $(id).addEventListener('change', () => { saveSettings(); updateLabels(); persist(); });
+});
+function updateLabels(){ $('labelA').innerText = $('teamA').value || 'Team A'; $('labelB').innerText = $('teamB').value || 'Team B'; $('projTitle').innerText = $('topic').value || 'Live Results'; }
 
-    function vote(team) {
-      if (team === "A") scoreA++;
-      else scoreB++;
-      document.getElementById("scoreA").innerText = scoreA;
-      document.getElementById("scoreB").innerText = scoreB;
-    }
-    function resetVotes() {
-      scoreA = 0; scoreB = 0;
-      document.getElementById("scoreA").innerText = scoreA;
-      document.getElementById("scoreB").innerText = scoreB;
-    }
-  </script>
+/* init */
+(function init(){
+  // load saved
+  loadSettings();
+  try{ votes = JSON.parse(localStorage.getItem(LS_PREFIX + 'votes') || '{"A":0,"B":0}'); }catch(e){ votes={A:0,B:0}; }
+  try{ claims = JSON.parse(localStorage.getItem(LS_PREFIX + 'claims') || '[]'); }catch(e){ claims=[]; }
+  // ensure teamName present (for older saved claims)
+  claims = claims.map(c => ({ teamName: c.team === 'A' ? ($('teamA').value || 'Team A') : ($('teamB').value || 'Team B'), ...c }));
+  renderAll();
+})();
+</script>
 </body>
 </html>
