@@ -1,147 +1,135 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mock Debate Chatbot + Live Vote Counter</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock Debate Chatbot</title>
   <style>
-    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#9aa6b2;color-scheme:dark}
-    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071029 0%,#071827 100%);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6eef6}
-    .app{max-width:1100px;margin:18px auto;padding:18px;display:grid;grid-template-columns:1fr 420px;gap:18px}
-    .card{background:rgba(255,255,255,0.02);border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
-    h1{font-size:20px;margin:0 0 10px 0}
-    .chat{height:540px;display:flex;flex-direction:column}
-    .messages{flex:1;overflow:auto;padding:8px;gap:8px;display:flex;flex-direction:column}
-    .input{display:flex;gap:8px;margin-top:10px}
-    textarea{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-    button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#012;cursor:pointer}
-    .claim{padding:8px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border:1px solid rgba(255,255,255,0.03)}
-    .muted{color:var(--muted);font-size:13px}
-    .small{font-size:13px}
-    .list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto}
-    .votepanel{display:flex;flex-direction:column;gap:8px}
-    .big{font-size:36px;font-weight:700}
-    .bigbtn{font-size:20px;padding:14px}
-    .valid{color:#10b981}
-    .invalid{color:#ef4444}
-    .unsure{color:#eab308}
+    body { margin:0; font-family:sans-serif; background:#0b1526; color:#e6eef6; }
+    .container { display:flex; gap:20px; padding:20px; }
+    .left, .right { flex:1; background:#101c33; padding:16px; border-radius:12px; }
+    h2 { margin-top:0; }
+    textarea { width:100%; min-height:50px; }
+    button { margin-top:6px; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; }
+    .claim { margin:6px 0; padding:6px; border-radius:6px; }
+    .valid { background:rgba(0,200,0,0.2); }
+    .invalid { background:rgba(200,0,0,0.2); }
+    .unsure { background:rgba(200,200,0,0.2); }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="card">
-      <h1>Mock Debate Chatbot</h1>
-      <div class="muted">Add claims, AI fact-checks them, moderator can override, votes track live.</div>
-      <hr />
-      <div style="display:flex;gap:10px;margin-bottom:8px;">
-        <select id="teamSelect"><option value="Team A">Team A</option><option value="Team B">Team B</option></select>
-        <input id="speaker" placeholder="Speaker name" style="flex:1;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
-      </div>
-      <div class="chat">
-        <div class="messages" id="messages"></div>
-        <div class="input">
-          <textarea id="claimInput" rows="2" placeholder="Paste a claim"></textarea>
-          <button id="addClaim">Add Claim</button>
-        </div>
-      </div>
-      <div class="list" id="claimsList"></div>
+  <div class="container">
+    <div class="left">
+      <h2>Debate Setup</h2>
+      <label>Debate Topic:</label>
+      <input id="topic" type="text" placeholder="Enter topic (e.g., Vote Scam)" style="width:100%;margin-bottom:10px;" />
+
+      <label>Team A (For):</label>
+      <input id="teamAName" type="text" placeholder="e.g., Rahul Gandhi / Congress" style="width:100%;margin-bottom:10px;" />
+
+      <label>Team B (Against):</label>
+      <input id="teamBName" type="text" placeholder="e.g., Narendra Modi / BJP" style="width:100%;margin-bottom:10px;" />
+
+      <h2>Add Claim</h2>
+      <select id="teamSelect">
+        <option value="A">Team A</option>
+        <option value="B">Team B</option>
+      </select>
+      <input id="speaker" type="text" placeholder="Speaker name" />
+      <textarea id="claimInput" placeholder="Enter claim..."></textarea>
+      <button id="addClaim">Add Claim</button>
+
+      <h2>Claims Board</h2>
+      <div id="claimsBoard"></div>
+      <button id="clearClaims" style="background:#c33;color:#fff;">Clear Claims</button>
     </div>
 
-    <div class="card">
-      <h1>Vote Counter</h1>
-      <div class="votepanel">
-        <div style="display:flex;gap:8px;align-items:center">
-          <div style="flex:1">
-            <div class="small muted">Team A</div>
-            <div id="teamACount" class="big">0</div>
-          </div>
-          <div style="flex:1">
-            <div class="small muted">Team B</div>
-            <div id="teamBCount" class="big">0</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button id="voteA">Vote Team A</button>
-          <button id="voteB">Vote Team B</button>
-          <button id="resetVotes">Reset</button>
-          <button id="clearClaims">Clear Claims</button>
-        </div>
+    <div class="right">
+      <h2>Vote Counter</h2>
+      <div id="scoreboard">
+        <p><span id="teamA_label">Team A</span>: <span id="scoreA">0</span></p>
+        <p><span id="teamB_label">Team B</span>: <span id="scoreB">0</span></p>
       </div>
+      <button onclick="vote('A')">Vote Team A</button>
+      <button onclick="vote('B')">Vote Team B</button>
+      <button onclick="resetVotes()">Reset</button>
     </div>
   </div>
 
   <script>
-    const API_BASE = "https://sstdebateaps.onrender.com"; // 🔗 Your backend API
+    const API_BASE = "https://sstdebateaps.onrender.com"; // your Render backend
+    let claims = [];
+    let scoreA = 0, scoreB = 0;
 
-    const claimsList = document.getElementById("claimsList");
-    const claimInput = document.getElementById("claimInput");
-    const addClaimBtn = document.getElementById("addClaim");
-    const teamSelect = document.getElementById("teamSelect");
-    const speaker = document.getElementById("speaker");
-
-    let claims = JSON.parse(localStorage.getItem("claims") || "[]");
-    let votes = JSON.parse(localStorage.getItem("votes") || '{"A":0,"B":0}');
-
-    function save() {
-      localStorage.setItem("claims", JSON.stringify(claims));
-      localStorage.setItem("votes", JSON.stringify(votes));
-    }
+    // Update team labels when inputs change
+    document.getElementById("teamAName").addEventListener("input", () => {
+      document.getElementById("teamA_label").innerText = document.getElementById("teamAName").value || "Team A";
+    });
+    document.getElementById("teamBName").addEventListener("input", () => {
+      document.getElementById("teamB_label").innerText = document.getElementById("teamBName").value || "Team B";
+    });
 
     function renderClaims() {
-      claimsList.innerHTML = "";
+      const board = document.getElementById("claimsBoard");
+      board.innerHTML = "";
       claims.forEach((c, i) => {
-        const el = document.createElement("div");
-        el.className = "claim";
-        el.innerHTML = `
-          <div><strong>${c.team}</strong> — ${c.speaker}</div>
-          <div>${c.text}</div>
-          <div>Status: <span class="${c.status}">${c.status || "Not verified"}</span></div>
-        `;
-        claimsList.appendChild(el);
+        const div = document.createElement("div");
+        div.className = "claim " + c.status;
+        div.innerHTML = `<b>${c.teamName} — ${c.speaker}</b><br>${c.text}<br>Status: ${c.status}`;
+        board.appendChild(div);
       });
     }
 
-    async function verifyClaim(claim, idx) {
+    document.getElementById("addClaim").onclick = () => {
+      const text = document.getElementById("claimInput").value.trim();
+      const speaker = document.getElementById("speaker").value.trim() || "anon";
+      const teamVal = document.getElementById("teamSelect").value;
+      const teamName = teamVal === "A" ? document.getElementById("teamAName").value || "Team A"
+                                       : document.getElementById("teamBName").value || "Team B";
+      if (!text) return;
+
+      const claim = { text, speaker, team: teamVal, teamName, status: "verifying" };
+      claims.push(claim);
+      renderClaims();
+      verifyClaim(claim, claims.length - 1);
+      document.getElementById("claimInput").value = "";
+    };
+
+    async function verifyClaim(claim, index) {
       try {
         const resp = await fetch(`${API_BASE}/api/ai-verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ claim })
+          body: JSON.stringify({
+            claim: claim.text,
+            team: claim.team,
+            topic: document.getElementById("topic").value || "General Debate"
+          })
         });
         const data = await resp.json();
-        if (data.error) throw new Error(data.error);
-        const best = data.labels?.[0] || "unsure";
-        claims[idx].status = best;
-      } catch (err) {
-        claims[idx].status = "unsure";
+        claims[index].status = data.verdict || "unsure";
+      } catch (e) {
+        claims[index].status = "unsure";
       }
-      save();
       renderClaims();
     }
 
-    addClaimBtn.onclick = () => {
-      const txt = claimInput.value.trim();
-      if (!txt) return;
-      const claim = { team: teamSelect.value, speaker: speaker.value || "anon", text: txt, status: "Not verified" };
-      claims.push(claim);
-      save();
+    document.getElementById("clearClaims").onclick = () => {
+      claims = [];
       renderClaims();
-      verifyClaim(txt, claims.length - 1);
-      claimInput.value = "";
     };
 
-    document.getElementById("voteA").onclick = () => { votes.A++; save(); renderVotes(); };
-    document.getElementById("voteB").onclick = () => { votes.B++; save(); renderVotes(); };
-    document.getElementById("resetVotes").onclick = () => { votes = {A:0,B:0}; save(); renderVotes(); };
-    document.getElementById("clearClaims").onclick = () => { claims = []; save(); renderClaims(); };
-
-    function renderVotes() {
-      document.getElementById("teamACount").innerText = votes.A;
-      document.getElementById("teamBCount").innerText = votes.B;
+    function vote(team) {
+      if (team === "A") scoreA++;
+      else scoreB++;
+      document.getElementById("scoreA").innerText = scoreA;
+      document.getElementById("scoreB").innerText = scoreB;
     }
-
-    renderClaims();
-    renderVotes();
+    function resetVotes() {
+      scoreA = 0; scoreB = 0;
+      document.getElementById("scoreA").innerText = scoreA;
+      document.getElementById("scoreB").innerText = scoreB;
+    }
   </script>
 </body>
 </html>
