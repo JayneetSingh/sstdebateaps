@@ -32,410 +32,137 @@
     .valid{background:rgba(16,185,129,0.12);color:#10b981}
     .invalid{background:rgba(239,68,68,0.12);color:#ef4444}
     .unsure{background:rgba(234,179,8,0.12);color:#eab308}
+    .small-link{font-size:12px;color:var(--accent);text-decoration:underline;cursor:pointer}
   </style>
 </head>
 <body>
   <div class="app">
     <div class="card">
-      <h1>Mock Debate Chatbot — Rahul Gandhi vs Narendra Modi (classroom edition)</h1>
+      <h1>Mock Debate Chatbot</h1>
+      <div class="muted">Add claims, AI fact-checks them, moderator can override, votes track live.</div>
       <hr />
       <div style="display:flex;gap:10px;margin-bottom:8px;">
-        <select id="teamSelect"><option value="Rahul Gandhi / Congress">Team A — Rahul Gandhi side</option><option value="Narendra Modi / BJP">Team B — Narendra Modi side</option></select>
-        <input id="speaker" placeholder="Speaker name (e.g., Ayaan)" style="flex:1;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
+        <select id="teamSelect"><option value="Team A">Team A</option><option value="Team B">Team B</option></select>
+        <input id="speaker" placeholder="Speaker name" style="flex:1;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
       </div>
       <div class="chat">
         <div class="messages" id="messages"></div>
         <div class="input">
-          <textarea id="claimInput" rows="2" placeholder="Paste a claim or point (e.g., 'ECI used fake logins to delete voters in Mahadevapura')"></textarea>
+          <textarea id="claimInput" rows="2" placeholder="Paste a claim"></textarea>
           <button id="addClaim">Add Claim</button>
         </div>
       </div>
       <hr />
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="small muted">Claims board — automatically verified using google</div>
-          <div>
-            <button id="openProjector" class="bigbtn">Open Projector View</button>
-          </div>
+          <div class="small muted">Claims board</div>
+          <button id="openProjector" class="bigbtn">Open Projector View</button>
         </div>
         <div class="list" id="claimsList"></div>
       </div>
-      <footer>Claims are verified server-side using Google</footer>
     </div>
 
     <div class="card">
-      <h1>Vote Counter (live)</h1>
+      <h1>Vote Counter</h1>
       <div class="votepanel">
         <div style="display:flex;gap:8px;align-items:center">
-          <div style="flex:1">
-            <div class="small muted">Team A</div>
-            <div id="teamAName" class="big">Rahul Gandhi / Congress</div>
-            <div id="teamACount" class="big">0</div>
-          </div>
-          <div style="flex:1">
-            <div class="small muted">Team B</div>
-            <div id="teamBName" class="big">Narendra Modi / BJP</div>
-            <div id="teamBCount" class="big">0</div>
-          </div>
+          <div style="flex:1"><div class="small muted">Team A</div><div id="teamACount" class="big">0</div></div>
+          <div style="flex:1"><div class="small muted">Team B</div><div id="teamBCount" class="big">0</div></div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button id="voteA">Vote Team A</button>
           <button id="voteB">Vote Team B</button>
           <button id="resetVotes">Reset</button>
-          <button id="clearClaims">Clear Claims</button>
           <button id="downloadCSV">Export CSV</button>
+          <button id="clearClaims" style="background:#ef4444;color:#fff">Clear Claims</button>
         </div>
       </div>
       <hr />
       <div class="admin card">
-        <div style="display:flex;flex-direction:column;gap:8px;width:100%">
-          <button id="verifyAllClaims" style="padding:8px;border-radius:8px;background:var(--accent);border:none;color:#012;cursor:pointer">Verify All Claims</button>
-        </div>
+        <label class="small muted">Moderator password:</label>
+        <input id="adminPass" placeholder="teacher-password" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
       </div>
     </div>
   </div>
 
   <div class="projector" id="projector">
     <div class="content">
-      <div style="font-size:28px;margin-bottom:6px">Live Result — Mock Debate</div>
+      <div style="font-size:28px;margin-bottom:6px">Live Result</div>
       <div style="display:flex;gap:40px;align-items:center;justify-content:center">
-        <div>
-          <div class="tag">Team A</div>
-          <div id="projA" class="big">0</div>
-        </div>
-        <div>
-          <div class="tag">Team B</div>
-          <div id="projB" class="big">0</div>
-        </div>
+        <div><div class="tag">Team A</div><div id="projA" class="big">0</div></div>
+        <div><div class="tag">Team B</div><div id="projB" class="big">0</div></div>
       </div>
       <div id="projWinner" style="margin-top:18px;font-size:22px"></div>
-      <div style="margin-top:20px;font-size:13px;color:#9aa6b2">Press ESC to exit projector mode.</div>
     </div>
   </div>
 
-  <script>
-    // ---------- CONFIG ----------
-    // Render backend URL (your URL)
-    const API_BASE = "https://sstdebateaps.onrender.com";
+<script>
+const API_BASE = "https://sstdebateaps.onrender.com"; // backend
 
-    // ---------- UI refs ----------
-    const messagesEl = document.getElementById('messages');
-    const claimsList = document.getElementById('claimsList');
-    const claimInput = document.getElementById('claimInput');
-    const addClaimBtn = document.getElementById('addClaim');
-    const teamSelect = document.getElementById('teamSelect');
-    const speaker = document.getElementById('speaker');
+let claims = JSON.parse(localStorage.getItem('mock_claims')||'[]');
+let votes = JSON.parse(localStorage.getItem('mock_votes')||'{"A":0,"B":0}');
 
-    let claims = JSON.parse(localStorage.getItem('mock_claims')||'[]');
-    let votes = JSON.parse(localStorage.getItem('mock_votes')||'{"A":0,"B":0}');
+function save(){localStorage.setItem('mock_claims',JSON.stringify(claims));localStorage.setItem('mock_votes',JSON.stringify(votes))}
 
-    function save(){ localStorage.setItem('mock_claims',JSON.stringify(claims)); localStorage.setItem('mock_votes',JSON.stringify(votes)); }
+function validityBadge(c){
+  if(!c.validity) return '<span class="valid-badge unsure">Not verified</span>';
+  if(c.validity==='valid') return '<span class="valid-badge valid">✓ Verified</span>';
+  if(c.validity==='invalid') return '<span class="valid-badge invalid">✗ Disputed</span>';
+  return '<span class="valid-badge unsure">⚠ Unsure</span>';
+}
 
-    function validityBadge(claim){
-      const v = claim.validity;
-      if(!v || v === '') return '<span class="valid-badge unsure">Not verified</span>';
-      if(v === 'verifying...') return '<span class="valid-badge unsure">🔍 Verifying...</span>';
-      if(v === 'valid') {
-        const info = claim.verificationInfo ? ` title="${claim.verificationInfo}"` : '';
-        return `<span class="valid-badge valid"${info}>✓ Verified</span>`;
-      }
-      if(v === 'invalid') {
-        const info = claim.verificationInfo ? ` title="${claim.verificationInfo}"` : '';
-        return `<span class="valid-badge invalid"${info}>✗ Disputed</span>`;
-      }
-      const info = claim.verificationInfo ? ` title="${claim.verificationInfo}"` : '';
-      return `<span class="valid-badge unsure"${info}>⚠ Uncertain</span>`;
-    }
+function render(){document.getElementById('claimsList').innerHTML='';
+  claims.forEach((c,i)=>{
+    const div=document.createElement('div');
+    div.className='claim';
+    div.innerHTML=`<div><strong>${c.team}</strong> — ${c.speaker||'unknown'}</div>
+      <div>${c.text}</div>
+      <div class="small muted">Status: ${validityBadge(c)}</div>`;
+    document.getElementById('claimsList').appendChild(div);
+  });
+  document.getElementById('messages').innerHTML=claims.map(c=>`<div class="claim">${c.text} — ${validityBadge(c)}</div>`).join('');
+}
 
-    function renderMessages(){
-      messagesEl.innerHTML='';
-      claims.slice().reverse().forEach(c=>{
-        const div=document.createElement('div');
-        div.className='claim';
-        div.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${c.team}</strong> — <span class="muted small">${c.speaker||'unknown'}</span></div><div class="small muted">${new Date(c.ts).toLocaleString()}</div></div><div style="margin-top:6px">${c.text}</div><div style="margin-top:8px" class="small muted">Status: ${validityBadge(c)}</div>`;
-        messagesEl.appendChild(div);
-      });
-    }
-
-    function renderClaims(){
-      claimsList.innerHTML='';
-      claims.forEach((c,idx)=>{
-        const el=document.createElement('div');
-        el.className='claim';
-        el.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${c.team}</strong> — ${c.speaker||'unknown'}</div><div class="small muted">${new Date(c.ts).toLocaleString()}</div></div><div style="margin-top:6px">${c.text}</div><div style="margin-top:8px" class="small muted">${validityBadge(c)}</div>`;
-        el.onclick = ()=> openClaimEditor(idx);
-        claimsList.appendChild(el);
-      });
-    }
-
-    function openClaimEditor(i){
-      const c = claims[i];
-      if(c.validity && c.validity !== '') {
-        alert(`This claim is already verified as: ${c.validity}`);
-        return;
-      }
-      // verify this claim via backend
-      verifyClaim(i);
-    }
-
-    addClaimBtn.onclick = ()=>{
-      const txt = claimInput.value.trim(); if(!txt) return;
-      const claim = {team:teamSelect.value, speaker:speaker.value||'', text:txt, ts:Date.now(), validity:'verifying...'};
-      claims.push(claim); claimInput.value=''; save(); renderClaims(); renderMessages();
-      // auto-verify newly added claim
-      setTimeout(()=> verifyClaim(claims.length - 1), 400);
-    };
-
-    // ---------- Backend-backed search ----------
-
-    async function searchWebBackend(query) {
-      // Primary: hit your backend proxy
-      try {
-        const resp = await fetch(`${API_BASE}/api/search`, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ query, num: 10 })
-        });
-        if(!resp.ok) {
-          console.warn('Backend search returned', resp.status);
-          let t = '';
-          try { t = await resp.text(); } catch(e){}
-          console.warn('Backend body:', t);
-          return await fallbackSearch(query);
-        }
-        const data = await resp.json();
-        return (data.items || []).map(item => ({
-          title: item.title || item.headline || '',
-          snippet: item.snippet || item.snippetText || item.snippet || '',
-          url: item.link || item.formattedUrl || item.url,
-          credibility: 'unknown'
-        }));
-      } catch (err) {
-        console.error('Backend search error, falling back:', err);
-        return await fallbackSearch(query);
-      }
-    }
-
-    // ---------- Verification flow ----------
-    async function verifyClaim(index) {
-      const claim = claims[index];
-      if(!claim) return;
-      try {
-        claim.validity = 'verifying...';
-        save(); renderClaims(); renderMessages();
-
-        const searchQuery = extractSearchTerms(claim.text);
-        const results = await searchWebBackend(searchQuery);
-
-        const analysis = analyzeSearchResults(results, claim.text);
-        claim.validity = analysis.credibility === 'valid' ? 'valid' : (analysis.credibility === 'invalid' ? 'invalid' : 'unsure');
-        claim.verificationInfo = analysis.explanation || '';
-        claim.sources = analysis.sources || [];
-        claim.lastVerified = new Date().toISOString();
-
-        save(); renderClaims(); renderMessages();
-      } catch (error) {
-        console.error('Verification failed:', error);
-        claim.validity = 'unsure';
-        claim.verificationInfo = 'Verification error: ' + (error.message || error);
-        save(); renderClaims(); renderMessages();
-      }
-    }
-
-    async function verifyAllClaims(){
-      const unverified = claims.map((c,i)=>({c,i})).filter(x=>!x.c.validity || x.c.validity === '' || x.c.validity === 'verifying...');
-      if(unverified.length === 0){
-        alert('All claims are already verified!');
-        return;
-      }
-      if(!confirm(`Verify ${unverified.length} claims via backend? This will use server-side API quota.`)) return;
-
-      let succ=0, fail=0;
-      for(const {i} of unverified){
-        try{
-          await verifyClaim(i);
-          succ++;
-          await new Promise(r=>setTimeout(r, 900)); // small delay
-        } catch(e){
-          fail++;
-        }
-      }
-      alert(`Verification finished — success: ${succ}, failed: ${fail}`);
-    }
-
-    // ---------- Search analysis helpers ----------
-    function extractSearchTerms(claimText){
-      const stopWords = ['the','a','an','and','or','but','in','on','at','to','for','of','with','by','is','are','was','were'];
-      const words = claimText.toLowerCase().split(/\s+/).filter(word => word.length > 2 && !stopWords.includes(word) && !/^\d+$/.test(word));
-      return words.slice(0,6).join(' ');
-    }
-
-    async function fallbackSearch(query){
-      const fallbackResults = [
-        { title:`Fact-check: ${query}`, snippet:"Multiple sources investigate this claim...", url:"https://factcheck.org/search", credibility:'reliable' },
-        { title:`News report: ${query}`, snippet:"Recent reports discuss this topic...", url:"https://news.example.com/search", credibility:'mixed' },
-        { title:`Analysis: ${query}`, snippet:"Expert analysis indicates...", url:"https://analysis.example.com/search", credibility:'reliable' }
-      ];
-      await new Promise(r=>setTimeout(r, 1000 + Math.random()*800));
-      return fallbackResults;
-    }
-
-    function assessSourceCredibility(url, title){
-      try {
-        const domain = new URL(url).hostname.toLowerCase().replace('www.','');
-        const reliable = ['factcheck.org','snopes.com','politifact.com','reuters.com','bbc.com','cnn.com','npr.org','apnews.com','theguardian.com','washingtonpost.com','nytimes.com','economist.com','wsj.com','nature.com','science.org','who.int','cdc.gov','gov.in'];
-        const mixed = ['wikipedia.org','youtube.com','twitter.com','facebook.com','reddit.com','quora.com','medium.com','blogspot.com'];
-        if(reliable.some(d=>domain.includes(d))) return 'reliable';
-        if(mixed.some(d=>domain.includes(d))) return 'mixed';
-        if(title && (title.toLowerCase().includes('fact-check')||title.toLowerCase().includes('verified'))) return 'reliable';
-      } catch(e){}
-      return 'mixed';
-    }
-
-    function analyzeSearchResults(results, originalClaim){
-      if(!results || results.length===0) return { credibility:'unsure', explanation:'No results', sources:[] };
-      const reliable = results.filter(r=>r.credibility==='reliable');
-      const mixed = results.filter(r=>r.credibility==='mixed');
-      const total = results.length;
-      const supporting = results.filter(r => containsSupportingEvidence(r.snippet, r.title, originalClaim)).length;
-      const contradicting = results.filter(r => containsContradictingEvidence(r.snippet, r.title, originalClaim)).length;
-      const reliableRatio = (reliable.length)/total;
-      const supportRatio = supporting/total;
-      const contradictRatio = contradicting/total;
-
-      let credibility, explanation;
-      if (reliableRatio >= 0.6 && supportRatio >= 0.4 && contradictRatio <= 0.2) {
-        credibility = 'valid';
-        explanation = `Strong evidence: ${reliable.length} reliable sources, ${supporting} supporting results`;
-      } else if (reliableRatio >= 0.4 && contradictRatio >= 0.4) {
-        credibility = 'invalid';
-        explanation = `Contradicted: ${contradicting} sources contradict this claim`;
-      } else if (reliableRatio >= 0.3 && (supportRatio >= 0.3 || contradictRatio <= 0.3)) {
-        credibility = 'unsure';
-        explanation = `Mixed evidence: ${reliable.length} reliable sources`;
-      } else {
-        credibility = 'unsure';
-        explanation = `Insufficient reliable evidence: ${reliable.length} credible sources found`;
-      }
-
-      return { credibility, explanation, sources: results.slice(0,5).map(r=>({title:r.title,url:r.url,credibility:r.credibility,snippet:(r.snippet||'').slice(0,100)+'...'})) };
-    }
-
-    function containsSupportingEvidence(snippet, title, claim){
-      const claimKeywords = extractKeywords(claim);
-      const content = (snippet + ' ' + (title||'')).toLowerCase();
-      const supportWords = ['confirmed','verified','true','accurate','evidence shows','studies show','report shows'];
-      const keywordMatches = claimKeywords.filter(k => content.includes(k.toLowerCase())).length;
-      const supportMatches = supportWords.filter(w => content.includes(w)).length;
-      return keywordMatches >= 1 && supportMatches >= 1;
-    }
-
-    function containsContradictingEvidence(snippet, title, claim){
-      const content = (snippet + ' ' + (title||'')).toLowerCase();
-      const contradictWords = ['false','debunked','myth','incorrect','misleading','no evidence','unsubstantiated','disputed'];
-      return contradictWords.some(w => content.includes(w));
-    }
-
-    function extractKeywords(claim){
-      const stopWords = ['the','a','an','and','or','but','in','on','at','to','for','of','with','by','is','are','was','were','has','have','will'];
-      return claim.toLowerCase().split(/\s+/).filter(w=>w.length>2 && !stopWords.includes(w)).slice(0,8);
-    }
-
-    // ---------- Buttons wiring ----------
-    document.addEventListener('DOMContentLoaded', ()=>{
-      document.getElementById('verifyAllClaims').onclick = verifyAllClaims;
-      renderClaims(); renderMessages(); renderVotes();
-    });
-    // Clear only claims (keeps votes intact)
-document.getElementById('clearClaims').onclick = () => {
-  // If mod password is set, require it
-  if (adminPass.value && adminPass.value.trim() !== '') {
-    const pw = prompt('Moderator password required to clear claims. Enter password:');
-    if (pw === null) return; // cancelled
-    if (pw !== adminPass.value) { alert('Wrong password — action cancelled.'); return; }
-  }
-
-  if (!claims || claims.length === 0) {
-    alert('No claims to clear.');
-    return;
-  }
-
-  if (!confirm(`Delete all ${claims.length} claims? This cannot be undone.`)) return;
-
-  // perform clear
-  claims = [];
-  save();
-  renderClaims();
-  renderMessages();
-
-  // optional: notify other tabs via BroadcastChannel (so projector / other tabs update)
-  if (typeof BroadcastChannel !== 'undefined') {
-    try {
-      const bc = new BroadcastChannel('mock-debate-votes');
-      bc.postMessage({ type: 'claims_cleared' });
-    } catch (e) { /* ignore */ }
-  }
-
-  alert('All claims cleared.');
+document.getElementById('addClaim').onclick=()=>{
+  const txt=document.getElementById('claimInput').value.trim();if(!txt)return;
+  const claim={team:document.getElementById('teamSelect').value,speaker:document.getElementById('speaker').value,text:txt,validity:''};
+  claims.push(claim);save();render();verifyClaim(claims.length-1);document.getElementById('claimInput').value='';
 };
 
-
-    // ---------- Votes (unchanged) ----------
-    const chan = ('BroadcastChannel' in window) ? new BroadcastChannel('mock-debate-votes') : null;
-    function broadcast(){ if(chan) chan.postMessage({type:'votes',votes}); }
-    if(chan){ chan.onmessage = (ev)=>{ if(ev.data && ev.data.type==='votes'){ votes = ev.data.votes; save(); renderVotes(); } } }
-
-    document.getElementById('voteA').onclick=()=>{ votes.A++; save(); broadcast(); renderVotes(); }
-    document.getElementById('voteB').onclick=()=>{ votes.B++; save(); broadcast(); renderVotes(); }
-    document.getElementById('resetVotes').onclick=()=>{ if(confirm('Reset votes?')){ votes={A:0,B:0}; save(); broadcast(); renderVotes(); } }
-
-    function renderVotes(){
-      document.getElementById('teamACount').innerText = votes.A;
-      document.getElementById('teamBCount').innerText = votes.B;
-      document.getElementById('projA').innerText = votes.A;
-      document.getElementById('projB').innerText = votes.B;
-      document.getElementById('projWinner').innerText = votes.A===votes.B? 'Tie' : (votes.A>votes.B? 'Team A leading' : 'Team B leading');
+async function verifyClaim(i){
+  const c=claims[i]; if(!c)return;
+  c.validity="verifying"; save(); render();
+  try{
+    const resp=await fetch(`${API_BASE}/api/ai-verify`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({claim:c.text})});
+    if(resp.ok){
+      const data=await resp.json();
+      c.validity=data.verdict; c.verificationInfo=data.explanation;
+      save();render();return;
     }
+  }catch(e){console.warn("AI failed",e)}
+  c.validity="unsure"; save();render();
+}
 
-    // ---------- CSV export ----------
-    document.getElementById('downloadCSV').onclick = () => {
-      const rows = [
-        ['Team','Votes'],
-        ['Team A (' + document.getElementById('teamAName').innerText + ')', votes.A],
-        ['Team B (' + document.getElementById('teamBName').innerText + ')', votes.B]
-      ];
-      const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'mock_debate_votes.csv'; a.click();
-      URL.revokeObjectURL(url);
-    };
+// votes
+document.getElementById('voteA').onclick=()=>{votes.A++;save();renderVotes()};
+document.getElementById('voteB').onclick=()=>{votes.B++;save();renderVotes()};
+document.getElementById('resetVotes').onclick=()=>{votes={A:0,B:0};save();renderVotes()};
+function renderVotes(){document.getElementById('teamACount').innerText=votes.A;document.getElementById('teamBCount').innerText=votes.B;document.getElementById('projA').innerText=votes.A;document.getElementById('projB').innerText=votes.B;document.getElementById('projWinner').innerText=votes.A===votes.B?'Tie':(votes.A>votes.B?'Team A leading':'Team B leading');}
+renderVotes();
 
-    // ---------- Projector (unchanged) ----------
-    async function openBigScreen(){
-      const title = 'Mock Debate Live Results';
-      const innerScript = "(function(){var bc=(typeof BroadcastChannel!=='undefined')?new BroadcastChannel('mock-debate-votes'):null;function update(v){var A=document.getElementById('a');var B=document.getElementById('b');if(A)A.innerText=v.A; if(B)B.innerText=v.B;}if(bc){bc.onmessage=function(e){if(e.data&&e.data.type==='votes')update(e.data.votes);};}try{if(window.opener&&window.opener.localStorage){var s=window.opener.localStorage.getItem('mock_votes');if(s)update(JSON.parse(s));}}catch(e){} })();";
-      const contentHTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title.replace(/</g,'&lt;') + '</title><style>body{margin:0;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh}.wrap{display:flex;gap:80px;align-items:center}.big{font-size:72px;font-weight:700}.tag{font-size:18px;opacity:0.8}</style></head><body><div class="wrap"><div><div class="tag">Team A</div><div id="a" class="big">0</div></div><div><div class="tag">Team B</div><div id="b" class="big">0</div></div></div><script>' + innerScript + '\x3C' + '/script></body></html>';
+// clear claims
+document.getElementById('clearClaims').onclick=()=>{
+  if(!claims.length)return alert("No claims"); 
+  if(!confirm("Clear all claims?"))return; 
+  claims=[]; save(); render(); alert("Cleared");
+};
 
-      try{
-        const bigWin = window.open('','_blank');
-        if(!bigWin) throw new Error('Popup blocked');
-        const doc = bigWin.document;
-        doc.open(); doc.write(contentHTML); doc.close();
-        return true;
-      }catch(err){
-        console.warn('openBigScreen failed:',err);
-        document.getElementById('projector').style.display='flex';
-        return false;
-      }
-    }
-    document.getElementById('openProjector').onclick = ()=> openBigScreen();
-    window.addEventListener('keydown', e=>{ if(e.key==='Escape'){ document.getElementById('projector').style.display='none' } });
+// projector
+document.getElementById('openProjector').onclick=()=>{document.getElementById('projector').style.display='flex'};
+window.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('projector').style.display='none'});
 
-    // Ensure UI renders if script runs early
-    if(document.readyState !== 'loading'){ renderClaims(); renderMessages(); renderVotes(); }
-
-  </script>
+// init
+render();
+</script>
 </body>
 </html>
